@@ -214,3 +214,7 @@ dotnet run --project tools/TrimCheck -- out/ArchiSteamFarm.CustomPlugins.MarketS
    ```
 
 GitHub Actions compile, teste, vérifie la compatibilité, puis crée la release avec `MarketSeller.zip`. Les installations existantes proposent alors la mise à jour.
+
+## Licence
+
+Copyright 2026 fraustiz, sous [licence Apache 2.0](LICENSE) : tu peux utiliser, modifier et redistribuer ce code, y compris dans un projet commercial, à condition de garder la licence et la mention de copyright (fichier [NOTICE](NOTICE)). C'est la même licence qu'ArchiSteamFarm.

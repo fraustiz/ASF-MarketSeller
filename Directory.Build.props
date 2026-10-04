@@ -13,10 +13,12 @@
 		<AnalysisMode>AllEnabledByDefault</AnalysisMode>
 		<Authors>fraustiz</Authors>
 		<CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+		<Copyright>Copyright © 2026 fraustiz</Copyright>
 		<Deterministic>true</Deterministic>
 		<LangVersion>latest</LangVersion>
 		<NoWarn>CA1028,CA1031,CS1591</NoWarn>
 		<Nullable>enable</Nullable>
+		<PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
 		<RepositoryUrl>https://github.com/fraustiz/ASF-MarketSeller</RepositoryUrl>
 		<TargetFramework>net10.0</TargetFramework>
 	</PropertyGroup>
