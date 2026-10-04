@@ -245,9 +245,63 @@
 /* Plugin version and updates */
 
 .ms-version {
+	align-items: center;
 	color: var(--ms-muted);
+	display: flex;
+	flex-wrap: wrap;
 	font-size: 0.8125em;
+	gap: 0.2em 0.45em;
 	margin-top: 1em;
+	min-height: 1.6em;
+}
+
+/* While checking and right after a check asked by the user, the line becomes a notice so the answer can't be missed */
+.ms-version--checking, .ms-version--ok, .ms-version--error {
+	background: color-mix(in srgb, var(--ms-accent) 8%, transparent);
+	border-left: 3px solid var(--ms-accent);
+	color: var(--ms-text);
+	font-size: 0.9375em;
+	gap: 0.2em 0.6em;
+	padding: 0.55em 0.9em;
+}
+
+.ms-version--ok {
+	animation: ms-appear 0.3s ease-out;
+	background: color-mix(in srgb, var(--ms-ok) 14%, transparent);
+	border-color: var(--ms-ok);
+	font-weight: 600;
+}
+
+.ms-version--error {
+	background: color-mix(in srgb, var(--ms-danger) 10%, transparent);
+	border-color: var(--ms-danger);
+}
+
+.ms-version__icon {
+	font-size: 1.1em;
+}
+
+.ms-spinner {
+	animation: ms-spin 0.8s linear infinite;
+	border: 2px solid var(--ms-line);
+	border-radius: 50%;
+	border-top-color: var(--ms-accent);
+	display: inline-block;
+	height: 0.9em;
+	width: 0.9em;
+}
+
+@keyframes ms-spin {
+	to { transform: rotate(360deg); }
+}
+
+@keyframes ms-appear {
+	from { opacity: 0; transform: translateY(-2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.ms-spinner { animation-duration: 2.4s; }
+	.ms-version--ok { animation: none; }
 }
 
 .ms-version .ms-button--quiet {

@@ -149,8 +149,6 @@ public sealed record UpdateInfo {
 	public required string CurrentVersion { get; init; }
 	public string? Error { get; init; }
 	public string? LatestVersion { get; init; }
-	public DateTime? PublishedAt { get; init; }
-	public string? ReleaseNotes { get; init; }
 	public required Uri ReleasePage { get; init; }
 	public bool UpdateAvailable { get; init; }
 }

@@ -12,6 +12,7 @@ using ArchiSteamFarm.Core;
 using ArchiSteamFarm.Plugins.Interfaces;
 using ArchiSteamFarm.Steam;
 using ArchiSteamFarm.Steam.Interaction;
+using ArchiSteamFarm.Storage;
 using SteamKit2;
 
 namespace ArchiSteamFarm.CustomPlugins.MarketSeller;
@@ -19,7 +20,7 @@ namespace ArchiSteamFarm.CustomPlugins.MarketSeller;
 internal sealed record BotState(bool ConfigPresent, MarketSellerConfig? Config, string? ConfigError, BotMarketSeller? Seller);
 
 [Export(typeof(IPlugin))]
-internal sealed class MarketSellerPlugin : IBot, IBotCardsFarmerInfo, IBotCommand2, IBotModules, IGitHubPluginUpdates, IWebInterface {
+internal sealed class MarketSellerPlugin : IBot, IBotCardsFarmerInfo, IBotCommand2, IBotModules, IPluginUpdates, IWebInterface {
 	// Set from the release tag by GitHub Actions, see Directory.Build.props
 	internal static Version PluginVersion => typeof(MarketSellerPlugin).Assembly.GetName().Version ?? throw new InvalidOperationException(nameof(PluginVersion));
 
@@ -43,14 +44,33 @@ internal sealed class MarketSellerPlugin : IBot, IBotCardsFarmerInfo, IBotComman
 		}
 	}
 
-	// Lets ASF update the plugin from the GitHub releases: the page's update button, the updateplugins command, or PluginsUpdateList in ASF.json
-	public string RepositoryName => UpdateChecker.RepositoryName;
-
 	[JsonInclude]
 	public Version Version => PluginVersion;
 
 	[JsonInclude]
 	public string WebPath => "/";
+
+	// Lets ASF update the plugin from the GitHub releases: the page's update button, the updateplugins command, or PluginsUpdateList in ASF.json.
+	// Implemented here rather than through IGitHubPluginUpdates, which asks api.github.com and fails once its anonymous quota is used up.
+	public async Task<Uri?> GetTargetReleaseURL(Version asfVersion, string asfVariant, bool asfUpdate, GlobalConfig.EUpdateChannel updateChannel, bool forced) {
+		LatestRelease latest = await UpdateChecker.GetLatestReleaseAsync().ConfigureAwait(false);
+
+		if (latest is not { Version: { } latestVersion, Tag: { } tag }) {
+			ASF.ArchiLogger.LogGenericWarning($"{nameof(MarketSeller)} : impossible de trouver la dernière version, {latest.Error}");
+
+			return null;
+		}
+
+		if (!forced && (UpdateChecker.Normalize(latestVersion) <= UpdateChecker.Normalize(Version))) {
+			ASF.ArchiLogger.LogGenericInfo($"{nameof(MarketSeller)} : déjà à jour (v{Version})");
+
+			return null;
+		}
+
+		ASF.ArchiLogger.LogGenericInfo($"{nameof(MarketSeller)} : mise à jour de la v{Version} vers la v{tag}");
+
+		return UpdateChecker.GetDownloadURL(tag);
+	}
 
 	public async Task<string?> OnBotCommand(Bot bot, EAccess access, string message, string[] args, ulong steamID = 0) {
 		ArgumentNullException.ThrowIfNull(bot);

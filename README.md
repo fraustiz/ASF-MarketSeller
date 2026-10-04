@@ -28,7 +28,7 @@ Autres possibilités :
 - la commande `updateplugins stable ArchiSteamFarm.CustomPlugins.MarketSeller`, dans la console ou le chat Steam d'un bot ;
 - ajouter `"ArchiSteamFarm.CustomPlugins.MarketSeller"` à `PluginsUpdateList` dans `ASF.json`, pour qu'ASF le mette à jour en même temps que ses propres vérifications.
 
-La page vérifie les nouvelles versions au plus une fois toutes les 30 minutes, avec un bouton « Vérifier maintenant ».
+La page vérifie les nouvelles versions au plus une fois toutes les 30 minutes, avec un bouton « Vérifier maintenant ». Elle passe par la page publique des releases et non par l'API de GitHub, limitée à 60 requêtes par heure pour toutes les machines d'un même réseau.
 
 ## Prérequis côté Steam
 

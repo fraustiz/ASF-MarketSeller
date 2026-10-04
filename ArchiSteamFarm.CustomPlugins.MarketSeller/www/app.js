@@ -265,6 +265,8 @@
 			selected: safeStorageGet(STORAGE_BOT),
 			tab: safeStorageGet(STORAGE_TAB) || 'inventory',
 			update: null,
+			updateChecking: false,
+			updateResult: null,
 			updating: null,
 		},
 
@@ -278,10 +280,38 @@
 		},
 
 		async checkUpdate(refresh) {
+			this.state.updateChecking = true;
+			this.state.updateResult = null;
+			this.render();
+
+			const startedAt = Date.now();
+			let update;
+
 			try {
-				this.state.update = await api('GET', `/Update${refresh ? '?refresh=true' : ''}`);
+				update = await api('GET', `/Update${refresh ? '?refresh=true' : ''}`);
 			} catch (error) {
-				this.state.update = { Error: error.message };
+				update = { Error: error.message };
+			}
+
+			// A check asked by the user stays visible long enough to be noticed, even when GitHub answers instantly
+			const elapsed = Date.now() - startedAt;
+
+			if (refresh && (elapsed < 900)) {
+				await new Promise(resolve => setTimeout(resolve, 900 - elapsed));
+			}
+
+			this.state.update = update;
+			this.state.updateChecking = false;
+
+			if (refresh) {
+				this.state.updateResult = update.Error ? 'error' : update.UpdateAvailable ? 'available' : 'latest';
+
+				clearTimeout(this.updateResultTimer);
+
+				this.updateResultTimer = setTimeout(() => {
+					this.state.updateResult = null;
+					this.render();
+				}, 8000);
 			}
 
 			this.render();
@@ -631,6 +661,13 @@
 					);
 			}
 
+			if (this.state.updateChecking) {
+				return h('p', { class: 'ms-version ms-version--checking', role: 'status', 'aria-live': 'polite' },
+					h('span', { 'aria-hidden': 'true', class: 'ms-spinner' }),
+					'Recherche d\'une nouvelle version de MarketSeller…',
+				);
+			}
+
 			if (!update) {
 				return null;
 			}
@@ -650,13 +687,26 @@
 				);
 			}
 
-			const status = update.Error ?
-				`impossible de vérifier les mises à jour (${update.Error.replace(/\.+$/, '')})` :
-				'à jour';
+			const checkButton = label => h('button', { class: 'ms-button ms-button--quiet', onClick: () => this.checkUpdate(true), type: 'button' }, label);
+			const current = update.CurrentVersion ? `MarketSeller ${update.CurrentVersion}` : 'MarketSeller';
+
+			if (update.Error) {
+				return h('p', { class: ['ms-version', this.state.updateResult === 'error' && 'ms-version--error'], role: this.state.updateResult === 'error' ? 'alert' : null },
+					`${current} : impossible de vérifier les mises à jour, ${update.Error.replace(/\.+$/, '')}.`,
+					checkButton('Réessayer'),
+				);
+			}
+
+			if (this.state.updateResult === 'latest') {
+				return h('p', { class: 'ms-version ms-version--ok', role: 'status' },
+					h('span', { 'aria-hidden': 'true', class: 'ms-version__icon' }, '✓'),
+					`Aucune mise à jour : tu as déjà la dernière version (${update.CurrentVersion}).`,
+				);
+			}
 
 			return h('p', { class: 'ms-version' },
-				update.CurrentVersion ? `MarketSeller ${update.CurrentVersion}, ${status}. ` : `MarketSeller : ${status}. `,
-				h('button', { class: 'ms-button ms-button--quiet', onClick: () => this.checkUpdate(true), type: 'button' }, 'Vérifier maintenant'),
+				`${current}, à jour${update.CheckedAt ? ` (vérifié ${relativeTime(update.CheckedAt)})` : ''}.`,
+				checkButton('Vérifier maintenant'),
 			);
 		},
 
