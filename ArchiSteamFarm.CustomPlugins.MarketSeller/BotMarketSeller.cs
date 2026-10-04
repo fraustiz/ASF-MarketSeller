@@ -266,10 +266,14 @@ internal sealed class BotMarketSeller : IDisposable {
 		}
 	}
 
-	// Whether the listing passes the same filters as inventory items, whoever created it
-	private bool IsManaged(OwnListing listing) {
-		if ((listing.AppID != Asset.SteamAppID) || (listing.ContextID != Asset.SteamCommunityContextID) || string.IsNullOrEmpty(listing.MarketHashName)) {
-			return false;
+	// Why a listing isn't managed, null when it passes the same filters as inventory items (whoever created it)
+	private string? GetUnmanagedReason(OwnListing listing) {
+		if ((listing.AppID != Asset.SteamAppID) || (listing.ContextID != Asset.SteamCommunityContextID)) {
+			return $"objet d'un jeu (AppID {listing.AppID}), MarketSeller ne gère que les objets de la communauté Steam";
+		}
+
+		if (string.IsNullOrEmpty(listing.MarketHashName)) {
+			return "objet non identifié";
 		}
 
 		CachedItem? item = ItemCache.Get(listing.MarketHashName);
@@ -277,7 +281,7 @@ internal sealed class BotMarketSeller : IDisposable {
 		// Items seen in the inventory are classified by ASF from Steam's tags, the others (e.g. listed by hand) from the listing's type line
 		if (item is not { Type: not EAssetType.Unknown }) {
 			if (listing.Type == EAssetType.Unknown) {
-				return false;
+				return "type d'objet non reconnu";
 			}
 
 			ItemCache.Remember(listing.MarketHashName, listing.Type, listing.Rarity, listing.RealAppID, listing.Name ?? listing.MarketHashName, listing.IconHash);
@@ -285,7 +289,17 @@ internal sealed class BotMarketSeller : IDisposable {
 			item = ItemCache.Get(listing.MarketHashName);
 		}
 
-		return (item != null) && Config.Types.Contains(item.Type) && !Config.Lock.IsItemLocked(listing.MarketHashName, item.Name, item.Rarity, item.RealAppID);
+		if (item == null) {
+			return "type d'objet non reconnu";
+		}
+
+		if (!Config.Types.Contains(item.Type)) {
+			return "catégorie non vendue";
+		}
+
+		string? lockReason = Config.Lock.GetItemLockReason(listing.MarketHashName, item.Name, item.Rarity, item.RealAppID);
+
+		return lockReason != null ? $"verrouillé : {lockReason}" : null;
 	}
 
 	private async Task<List<Asset>?> LoadInventoryAsync() {
@@ -332,10 +346,6 @@ internal sealed class BotMarketSeller : IDisposable {
 			return Finish(problem);
 		}
 
-		if (!dryRun && (!Config.AutoConfirm || !Bot.HasMobileAuthenticator)) {
-			return Finish("le réajustement nécessite l'authentificateur mobile ASF et AutoConfirm, sinon les objets remis en vente resteraient en attente de confirmation.");
-		}
-
 		Dictionary<string, PriceQuote> quotes = new(StringComparer.Ordinal);
 		uint removed = 0;
 
@@ -349,7 +359,33 @@ internal sealed class BotMarketSeller : IDisposable {
 			}
 
 			Dictionary<string, Dictionary<uint, uint>> ownPrices = GroupOwnPrices(listings);
-			List<IGrouping<string, OwnListing>> managedListings = listings.Where(IsManaged).GroupBy(static listing => listing.MarketHashName!, StringComparer.Ordinal).ToList();
+			List<OwnListing> managed = [];
+
+			foreach (OwnListing listing in listings) {
+				string? unmanagedReason = GetUnmanagedReason(listing);
+
+				if (unmanagedReason == null) {
+					managed.Add(listing);
+
+					continue;
+				}
+
+				CachedItem? knownItem = string.IsNullOrEmpty(listing.MarketHashName) ? null : ItemCache.Get(listing.MarketHashName);
+
+				lines.Add(new RepriceLine {
+					CreatedByPlugin = Listings.IsCreatedByPlugin(listing.ListingID),
+					CurrentBuyerPrice = listing.BuyerPrice,
+					IconHash = knownItem?.IconHash ?? listing.IconHash,
+					ListingID = listing.ListingID.ToString(CultureInfo.InvariantCulture),
+					MarketHashName = listing.MarketHashName ?? "",
+					Name = knownItem?.Name ?? listing.Name ?? listing.MarketHashName ?? "objet inconnu",
+					Reason = unmanagedReason,
+					Status = ERepriceStatus.Ignored,
+					Type = knownItem is { Type: not EAssetType.Unknown } ? knownItem.Type : listing.Type
+				});
+			}
+
+			List<IGrouping<string, OwnListing>> managedListings = managed.GroupBy(static listing => listing.MarketHashName!, StringComparer.Ordinal).ToList();
 			uint done = 0;
 
 			foreach (IGrouping<string, OwnListing> group in managedListings) {
@@ -370,7 +406,8 @@ internal sealed class BotMarketSeller : IDisposable {
 					Name = name,
 					Reason = reason,
 					Status = status,
-					TargetBuyerPrice = targetPrice
+					TargetBuyerPrice = targetPrice,
+					Type = item?.Type ?? EAssetType.Unknown
 				};
 
 				if (quoteResult.Quote is not { } quote) {
@@ -672,6 +709,13 @@ internal sealed class BotMarketSeller : IDisposable {
 	}
 
 	private void StartFromSchedule(EOperation operation) {
+		// Without ASF confirming them, repriced listings would wait for the user every couple of hours: only manual reprices then
+		if ((operation == EOperation.Reprice) && (!Config.AutoConfirm || !Bot.HasMobileAuthenticator)) {
+			Bot.ArchiLogger.LogGenericDebug("Réajustement planifié ignoré, pas d'authentificateur mobile ASF pour confirmer les annonces remises en vente");
+
+			return;
+		}
+
 		if (!TryStart(operation)) {
 			Bot.ArchiLogger.LogGenericDebug($"{ReportFormatter.GetTitle(operation)} planifiée ignorée, une opération est déjà en cours");
 		}

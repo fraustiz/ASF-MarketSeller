@@ -332,6 +332,21 @@ a.ms-button {
 	text-decoration: none;
 }
 
+/* Apply a preview */
+
+.ms-apply {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5em 1.5em;
+	justify-content: space-between;
+	margin: 0 0 0.75em;
+}
+
+.ms-apply p {
+	flex: 1 1 28em;
+}
+
 /* Progress */
 
 .ms-progress {

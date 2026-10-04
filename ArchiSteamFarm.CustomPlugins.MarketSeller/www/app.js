@@ -825,6 +825,52 @@
 			);
 		},
 
+		// After a preview, applies it from where the user is looking, the header buttons do the same
+		renderApplyBar(bot, result, operation) {
+			if (!result.DryRun) {
+				return null;
+			}
+
+			const selling = operation === 'Sell';
+			const count = selling ?
+				result.Lines.filter(line => line.Status === 'Listed').reduce((total, line) => total + line.Amount, 0) :
+				result.Lines.filter(line => (line.Status === 'Repriced') || (line.Status === 'Withdrawn')).length;
+
+			if (count === 0) {
+				return null;
+			}
+
+			if (bot.DryRun) {
+				return h('div', { class: 'ms-notice ms-apply' },
+					h('p', null, 'Le mode simulation est activé : désactive-le dans les réglages pour appliquer cet aperçu pour de vrai.'),
+					h('button', { class: 'ms-button', onClick: () => this.setTab('settings'), type: 'button' }, 'Ouvrir les réglages'),
+				);
+			}
+
+			const label = selling ?
+				(count > 1 ? `Mettre en vente ces ${count} objets` : 'Mettre en vente cet objet') :
+				(count > 1 ? `Réajuster ces ${count} annonces` : 'Réajuster cette annonce');
+
+			const confirmation = bot.HasMobileAuthenticator ? 'ASF les confirmera automatiquement.' : 'Tu devras les confirmer dans l\'application Steam Mobile.';
+			const note = selling ?
+				`Les prix sont recalculés au moment de la mise en vente. ${confirmation}` :
+				`Chaque annonce est retirée puis remise en vente au nouveau prix, recalculé au moment du réajustement. ${confirmation}`;
+
+			const armed = this.state.confirm === operation;
+			const blockedReason = !bot.Connected ? 'Le bot n\'est pas connecté à Steam.' : bot.Progress ? 'Une opération est déjà en cours.' : null;
+
+			return h('div', { class: 'ms-notice ms-apply' },
+				h('p', null, note),
+				h('button', {
+					class: ['ms-button', 'ms-button--primary', armed && 'ms-button--armed'],
+					disabled: Boolean(blockedReason),
+					onClick: () => this.start(operation),
+					title: blockedReason,
+					type: 'button',
+				}, armed ? `Confirmer : ${label.charAt(0).toLowerCase()}${label.slice(1)}` : label),
+			);
+		},
+
 		resultHeader(result, summaryText) {
 			return h('div', { class: 'ms-result' },
 				h('p', { class: 'ms-result__text' },
@@ -867,6 +913,7 @@
 
 			return h('div', null,
 				this.resultHeader(result, this.summarizeSell(result)),
+				this.renderApplyBar(bot, result, 'Sell'),
 				h('div', { class: 'ms-filters', role: 'group', 'aria-label': 'Filtrer les objets' },
 					filters.map(([id, label]) => h('button', {
 						'aria-pressed': String(filter === id),
@@ -1045,13 +1092,14 @@
 				return h('div', null, this.resultHeader(result, result.Error));
 			}
 
-			const statusOrder = ['Repriced', 'Withdrawn', 'Failed', 'Kept', 'Skipped', 'Unchanged'];
+			const statusOrder = ['Repriced', 'Withdrawn', 'Failed', 'Kept', 'Skipped', 'Unchanged', 'Ignored'];
 			const lines = [...result.Lines].sort((a, b) => (statusOrder.indexOf(a.Status) - statusOrder.indexOf(b.Status)) || a.Name.localeCompare(b.Name));
 
 			return h('div', null,
 				this.resultHeader(result, this.summarizeReprice(result)),
+				this.renderApplyBar(bot, result, 'Reprice'),
 				lines.length === 0 ?
-					h('div', { class: 'ms-empty' }, h('p', null, 'Aucune annonce à gérer pour l\'instant. MarketSeller gère toutes tes annonces d\'objets qui passent tes filtres (catégories et verrous), qu\'il les ait créées ou non.')) :
+					h('div', { class: 'ms-empty' }, h('p', null, 'Tu n\'as aucune annonce en cours sur le marché.')) :
 					h('div', { class: 'ms-table-wrap' },
 						h('table', { class: 'ms-table' },
 							h('thead', null, h('tr', null,
@@ -1074,17 +1122,22 @@
 			const total = result.Lines.length;
 
 			if (total === 0) {
-				return 'aucune annonce à vérifier.';
+				return 'aucune annonce en cours sur le marché.';
 			}
 
+			const ignored = count('Ignored');
+			const managed = total - ignored;
+			const manual = result.Lines.filter(line => (line.Status !== 'Ignored') && !line.CreatedByPlugin).length;
 			const changed = count('Repriced');
 			const withdrawn = count('Withdrawn');
-			const manual = result.Lines.filter(line => !line.CreatedByPlugin).length;
-			let text = `${plural(total, 'annonce vérifiée', 'annonces vérifiées')}${manual > 0 ? ` (dont ${plural(manual, 'créée à la main', 'créées à la main')})` : ''} : `;
 
-			text += result.DryRun ?
-				`${plural(changed, 'serait réajustée', 'seraient réajustées')}, ${plural(withdrawn, 'serait retirée', 'seraient retirées')}, ${count('Unchanged')} au bon prix.` :
-				`${plural(changed, 'réajustée', 'réajustées')}, ${plural(withdrawn, 'retirée', 'retirées')}, ${count('Unchanged')} au bon prix.`;
+			let text = `${plural(total, 'annonce en vente', 'annonces en vente')} : ${plural(managed, 'gérée', 'gérées')} par MarketSeller${manual > 0 ? ` (dont ${plural(manual, 'créée à la main', 'créées à la main')})` : ''}${ignored > 0 ? `, ${plural(ignored, 'non gérée', 'non gérées')}` : ''}.`;
+
+			if (managed > 0) {
+				text += result.DryRun ?
+					` ${sentence(`${plural(changed, 'serait réajustée', 'seraient réajustées')}, ${plural(withdrawn, 'serait retirée', 'seraient retirées')}, ${count('Unchanged')} au bon prix.`)}` :
+					` ${sentence(`${plural(changed, 'réajustée', 'réajustées')}, ${plural(withdrawn, 'retirée', 'retirées')}, ${count('Unchanged')} au bon prix.`)}`;
+			}
 
 			if (count('Kept') > 0) {
 				text += ` ${plural(count('Kept'), 'annonce créée à la main reste', 'annonces créées à la main restent')} en vente malgré un verrou de prix.`;
@@ -1119,6 +1172,7 @@
 				Repriced: [dryRun ? 'À réajuster' : 'Réajusté', 'listed'],
 				Withdrawn: [dryRun ? 'À retirer' : 'Retiré', 'locked'],
 				Kept: ['Laissée en vente', 'ok'],
+				Ignored: ['Non gérée', 'muted'],
 				Skipped: ['Sans prix de référence', 'muted'],
 				Failed: ['Échec', 'failed'],
 			};
@@ -1130,6 +1184,8 @@
 				reason = this.describePriceLock(line.AdjustedPrice, currency);
 			} else if (line.Status === 'Kept') {
 				reason = `${this.describePriceLock(line.AdjustedPrice, currency)}, mais tu l'as mise en vente toi-même`;
+			} else if ((line.Status === 'Ignored') && (line.Reason === 'catégorie non vendue') && TYPE_LABELS[line.Type]) {
+				reason = `catégorie non vendue (${TYPE_LABELS[line.Type].toLowerCase()}), à cocher dans les réglages pour qu'elle soit gérée`;
 			}
 
 			return h('div', null,

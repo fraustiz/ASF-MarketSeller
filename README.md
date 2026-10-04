@@ -33,7 +33,7 @@ La page vérifie les nouvelles versions au plus une fois toutes les 30 minutes, 
 ## Prérequis côté Steam
 
 - Le compte doit avoir accès au marché : au moins 5 $ dépensés, Steam Guard actif depuis 15 jours, pas de restriction en cours.
-- **Authentificateur mobile importé dans ASF** (fichier `.maFile` dans le dossier `config`) : il valide les mises en vente automatiquement. Sans lui, il faut confirmer chaque annonce dans l'application Steam, et le réajustement des prix est désactivé.
+- **Authentificateur mobile importé dans ASF** (fichier `.maFile` dans le dossier `config`) : il valide les mises en vente automatiquement. Sans lui, il faut confirmer chaque annonce dans l'application Steam, et le réajustement automatique des prix ne tourne pas (il retirerait tes annonces régulièrement en attendant ta confirmation). Le réajustement lancé à la main reste possible.
 - Commence en simulation (case « Mode simulation » ou commande `mpreview`) pour vérifier les prix avant de vendre pour de vrai.
 
 ## La page Marché
@@ -42,8 +42,8 @@ La page vérifie les nouvelles versions au plus une fois toutes les 30 minutes, 
   - « Aperçu » et « Vérifier les prix » ne modifient rien.
   - « Vendre maintenant » et « Réajuster » demandent un second clic pour confirmer.
   - Pendant une opération, une barre montre où elle en est (objet en cours, nombre traité sur le total).
-- **Inventaire** : le résultat du dernier aperçu ou de la dernière vente. Pour chaque objet : le prix de mise en vente, ce que tu reçois, et une échelle qui situe ton prix entre le meilleur acheteur et l'annonce la moins chère. Les filtres séparent ce qui est vendu, ce qui est gardé ou verrouillé (avec la raison), et ce qui a été ignoré.
-- **Annonces en cours** : le résultat de la dernière vérification ou du dernier réajustement, avec l'ancien et le nouveau prix de chaque annonce. Les annonces que tu as créées à la main sont signalées.
+- **Inventaire** : le résultat du dernier aperçu ou de la dernière vente. Après un aperçu, un bouton « Mettre en vente ces N objets » l'applique directement. Pour chaque objet : le prix de mise en vente, ce que tu reçois, et une échelle qui situe ton prix entre le meilleur acheteur et l'annonce la moins chère. Les filtres séparent ce qui est vendu, ce qui est gardé ou verrouillé (avec la raison), et ce qui a été ignoré.
+- **Annonces en cours** : toutes tes annonces en vente, avec l'ancien et le nouveau prix de celles que MarketSeller gère. Les annonces que tu as créées à la main sont signalées, et celles qu'il ne gère pas sont affichées avec la raison (autre jeu, catégorie non cochée, objet verrouillé…). Après « Vérifier les prix », un bouton « Réajuster ces N annonces » applique les changements.
 - **Réglages** : toutes les options dans un formulaire, avec un exemple de prix calculé en direct. « Enregistrer » écrit dans le fichier de config du bot, qui se reconnecte quelques secondes à Steam pour appliquer les réglages, comme quand on enregistre une config depuis ASF.
 
 La page utilise le thème, le mode sombre et le mot de passe IPC de l'interface d'ASF. Son API (`/Api/MarketSeller`) est protégée par ce même mot de passe.

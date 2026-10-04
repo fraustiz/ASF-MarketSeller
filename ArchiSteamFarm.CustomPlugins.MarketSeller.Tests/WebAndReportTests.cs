@@ -80,6 +80,20 @@ internal sealed class WebAndReportTests {
 	}
 
 	[TestMethod]
+	public void RepriceSummaryCountsEveryListing() {
+		RepriceLine Line(ERepriceStatus status, bool createdByPlugin = false) => new() { CreatedByPlugin = createdByPlugin, CurrentBuyerPrice = 5, ListingID = "1", MarketHashName = "a", Name = "A", Status = status };
+
+		RepriceRunResult result = new() {
+			FinishedAt = Now,
+			Lines = [Line(ERepriceStatus.Repriced), Line(ERepriceStatus.Unchanged, true), Line(ERepriceStatus.Unchanged), Line(ERepriceStatus.Ignored), Line(ERepriceStatus.Ignored)],
+			Operation = EOperation.RepricePreview,
+			StartedAt = Now
+		};
+
+		Assert.StartsWith("5 annonce(s) en vente, 3 gérée(s) dont 2 créée(s) à la main : 1 seraient réajustée(s), 0 seraient retirée(s), 2 inchangée(s), 0 sans prix de référence, 0 échec(s). 2 non gérée(s).", ReportFormatter.Summarize(result));
+	}
+
+	[TestMethod]
 	public void SummaryReportsErrorsAsIs() {
 		SellRunResult result = new() { Error = "le bot n'est pas connecté.", FinishedAt = Now, Operation = EOperation.Sell, StartedAt = Now };
 

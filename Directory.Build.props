@@ -1,7 +1,7 @@
 <Project>
 	<PropertyGroup>
 		<!-- Plugin version, overridden by the tag name when GitHub Actions builds a release -->
-		<Version>1.3.1</Version>
+		<Version>1.3.2</Version>
 
 		<!-- ASF release the plugin is compiled against: its ArchiSteamFarm.dll is downloaded on first build, see Directory.Build.targets -->
 		<ASFVersion>6.3.10.3</ASFVersion>

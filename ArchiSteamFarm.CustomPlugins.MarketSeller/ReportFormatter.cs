@@ -84,12 +84,14 @@ internal static class ReportFormatter {
 		}
 
 		if (result.Lines.Count == 0) {
-			return AppendNotices("aucune annonce gérée par MarketSeller en cours.", result.RateLimitedUntil, false);
+			return AppendNotices("aucune annonce en cours sur le marché.", result.RateLimitedUntil, false);
 		}
 
 		string verb = result.DryRun ? "seraient" : "ont été";
+		int ignored = Count(result.Lines, ERepriceStatus.Ignored);
+		int managed = result.Lines.Count - ignored;
 
-		string summary = $"{result.Lines.Count} annonce(s) vérifiée(s) dont {result.Lines.Count(static line => !line.CreatedByPlugin)} créée(s) à la main : {Count(result.Lines, ERepriceStatus.Repriced)} {verb} réajustée(s), {Count(result.Lines, ERepriceStatus.Withdrawn)} {verb} retirée(s), {Count(result.Lines, ERepriceStatus.Unchanged) + Count(result.Lines, ERepriceStatus.Kept)} inchangée(s), {Count(result.Lines, ERepriceStatus.Skipped)} sans prix de référence, {Count(result.Lines, ERepriceStatus.Failed)} échec(s).";
+		string summary = $"{result.Lines.Count} annonce(s) en vente, {managed} gérée(s) dont {result.Lines.Count(static line => (line.Status != ERepriceStatus.Ignored) && !line.CreatedByPlugin)} créée(s) à la main : {Count(result.Lines, ERepriceStatus.Repriced)} {verb} réajustée(s), {Count(result.Lines, ERepriceStatus.Withdrawn)} {verb} retirée(s), {Count(result.Lines, ERepriceStatus.Unchanged) + Count(result.Lines, ERepriceStatus.Kept)} inchangée(s), {Count(result.Lines, ERepriceStatus.Skipped)} sans prix de référence, {Count(result.Lines, ERepriceStatus.Failed)} échec(s). {ignored} non gérée(s).";
 
 		return AppendNotices(summary, result.RateLimitedUntil, false);
 	}
@@ -142,6 +144,7 @@ internal static class ReportFormatter {
 		ERepriceStatus.Repriced => $"{line.Name} : {FormatPrice(line.CurrentBuyerPrice, currency)} → {FormatPrice(line.TargetBuyerPrice ?? 0, currency)}",
 		ERepriceStatus.Withdrawn => $"{line.Name} : retiré de la vente, {line.Reason}",
 		ERepriceStatus.Kept => $"{line.Name} : laissé en vente, {line.Reason}",
+		ERepriceStatus.Ignored => $"{line.Name} : non gérée ({line.Reason})",
 		ERepriceStatus.Failed => $"{line.Name} : échec ({line.Reason ?? "raison inconnue"})",
 		_ => $"{line.Name} : prix laissé tel quel ({line.Reason ?? "raison inconnue"})"
 	};

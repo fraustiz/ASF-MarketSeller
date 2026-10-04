@@ -35,7 +35,10 @@ public enum ERepriceStatus : byte {
 	Failed,
 
 	// Hand-made listing hit by a price lock, left on the market
-	Kept
+	Kept,
+
+	// Listing the plugin doesn't manage (other game, category not sold, locked item...), shown so every listing is accounted for
+	Ignored
 }
 
 public sealed record SellLine {
@@ -91,6 +94,9 @@ public sealed record RepriceLine {
 	public string? Reason { get; init; }
 	public required ERepriceStatus Status { get; init; }
 	public uint? TargetBuyerPrice { get; init; }
+
+	[JsonConverter(typeof(JsonStringEnumConverter<EAssetType>))]
+	public EAssetType Type { get; init; }
 }
 
 public sealed record RepriceRunResult {
