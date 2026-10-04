@@ -995,13 +995,13 @@
 				return h('div', null, this.resultHeader(result, result.Error));
 			}
 
-			const statusOrder = ['Repriced', 'Withdrawn', 'Failed', 'Skipped', 'Unchanged'];
+			const statusOrder = ['Repriced', 'Withdrawn', 'Failed', 'Kept', 'Skipped', 'Unchanged'];
 			const lines = [...result.Lines].sort((a, b) => (statusOrder.indexOf(a.Status) - statusOrder.indexOf(b.Status)) || a.Name.localeCompare(b.Name));
 
 			return h('div', null,
 				this.resultHeader(result, this.summarizeReprice(result)),
 				lines.length === 0 ?
-					h('div', { class: 'ms-empty' }, h('p', null, 'Aucune annonce gérée par MarketSeller pour l\'instant. Seules les annonces d\'objets déjà vus dans l\'inventaire, et qui passent tes filtres, sont réajustées.')) :
+					h('div', { class: 'ms-empty' }, h('p', null, 'Aucune annonce à gérer pour l\'instant. MarketSeller gère toutes tes annonces d\'objets qui passent tes filtres (catégories et verrous), qu\'il les ait créées ou non.')) :
 					h('div', { class: 'ms-table-wrap' },
 						h('table', { class: 'ms-table' },
 							h('thead', null, h('tr', null,
@@ -1010,7 +1010,7 @@
 								h('th', { scope: 'col' }, 'Statut'),
 							)),
 							h('tbody', null, lines.map(line => h('tr', null,
-								h('td', null, this.renderItem(line.Name, line.IconHash, [])),
+								h('td', null, this.renderItem(line.Name, line.IconHash, [line.CreatedByPlugin ? null : 'annonce créée à la main'])),
 								h('td', { class: 'ms-num' }, this.renderChange(line, result.Currency)),
 								h('td', null, this.renderRepriceStatus(line, result.DryRun, result.Currency)),
 							))),
@@ -1029,11 +1029,16 @@
 
 			const changed = count('Repriced');
 			const withdrawn = count('Withdrawn');
-			let text = `${plural(total, 'annonce vérifiée', 'annonces vérifiées')} : `;
+			const manual = result.Lines.filter(line => !line.CreatedByPlugin).length;
+			let text = `${plural(total, 'annonce vérifiée', 'annonces vérifiées')}${manual > 0 ? ` (dont ${plural(manual, 'créée à la main', 'créées à la main')})` : ''} : `;
 
 			text += result.DryRun ?
 				`${plural(changed, 'serait réajustée', 'seraient réajustées')}, ${plural(withdrawn, 'serait retirée', 'seraient retirées')}, ${count('Unchanged')} au bon prix.` :
 				`${plural(changed, 'réajustée', 'réajustées')}, ${plural(withdrawn, 'retirée', 'retirées')}, ${count('Unchanged')} au bon prix.`;
+
+			if (count('Kept') > 0) {
+				text += ` ${plural(count('Kept'), 'annonce créée à la main reste', 'annonces créées à la main restent')} en vente malgré un verrou de prix.`;
+			}
 
 			if (result.Relist) {
 				text += ` Remise en vente : ${this.summarizeSell(result.Relist)}`;
@@ -1063,12 +1068,19 @@
 				Unchanged: ['Au bon prix', 'ok'],
 				Repriced: [dryRun ? 'À réajuster' : 'Réajusté', 'listed'],
 				Withdrawn: [dryRun ? 'À retirer' : 'Retiré', 'locked'],
+				Kept: ['Laissée en vente', 'ok'],
 				Skipped: ['Sans prix de référence', 'muted'],
 				Failed: ['Échec', 'failed'],
 			};
 
 			const [label, tone] = statuses[line.Status] || [line.Status, 'muted'];
-			const reason = line.Status === 'Withdrawn' ? this.describePriceLock(line.AdjustedPrice, currency) : line.Reason;
+			let reason = line.Reason;
+
+			if (line.Status === 'Withdrawn') {
+				reason = this.describePriceLock(line.AdjustedPrice, currency);
+			} else if (line.Status === 'Kept') {
+				reason = `${this.describePriceLock(line.AdjustedPrice, currency)}, mais tu l'as mise en vente toi-même`;
+			}
 
 			return h('div', null,
 				h('span', { class: `ms-status ms-status--${tone}` }, h('span', { class: 'ms-dot' }), label),

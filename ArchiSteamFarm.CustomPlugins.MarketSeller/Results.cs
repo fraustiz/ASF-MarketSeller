@@ -32,7 +32,10 @@ public enum ERepriceStatus : byte {
 	Repriced,
 	Withdrawn,
 	Skipped,
-	Failed
+	Failed,
+
+	// Hand-made listing hit by a price lock, left on the market
+	Kept
 }
 
 public sealed record SellLine {
@@ -73,6 +76,10 @@ public sealed record SellRunResult {
 
 public sealed record RepriceLine {
 	public uint? AdjustedPrice { get; init; }
+
+	// False for listings created by hand or by another tool, which the plugin took over
+	public bool CreatedByPlugin { get; init; }
+
 	public required uint CurrentBuyerPrice { get; init; }
 	public string? IconHash { get; init; }
 

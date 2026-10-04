@@ -43,7 +43,7 @@ La page vérifie les nouvelles versions au plus une fois toutes les 30 minutes, 
   - « Vendre maintenant » et « Réajuster » demandent un second clic pour confirmer.
   - Pendant une opération, une barre montre où elle en est (objet en cours, nombre traité sur le total).
 - **Inventaire** : le résultat du dernier aperçu ou de la dernière vente. Pour chaque objet : le prix de mise en vente, ce que tu reçois, et une échelle qui situe ton prix entre le meilleur acheteur et l'annonce la moins chère. Les filtres séparent ce qui est vendu, ce qui est gardé ou verrouillé (avec la raison), et ce qui a été ignoré.
-- **Annonces en cours** : le résultat de la dernière vérification ou du dernier réajustement, avec l'ancien et le nouveau prix de chaque annonce.
+- **Annonces en cours** : le résultat de la dernière vérification ou du dernier réajustement, avec l'ancien et le nouveau prix de chaque annonce. Les annonces que tu as créées à la main sont signalées.
 - **Réglages** : toutes les options dans un formulaire, avec un exemple de prix calculé en direct. « Enregistrer » écrit dans le fichier de config du bot, qui se reconnecte quelques secondes à Steam pour appliquer les réglages, comme quand on enregistre une config depuis ASF.
 
 La page utilise le thème, le mode sombre et le mot de passe IPC de l'interface d'ASF. Son API (`/Api/MarketSeller`) est protégée par ce même mot de passe.
@@ -139,7 +139,7 @@ Un objet verrouillé n'est jamais mis en vente.
 | `PriceAboveCents` | Les objets dont le prix calculé est supérieur ou égal à cette valeur, pour garder ce qui vaut cher. |
 | `PriceBelowCents` | Les objets dont le prix calculé est inférieur à cette valeur, pour ne pas brader ce qui ne vaut rien. |
 
-Les verrous de prix comparent le prix calculé (source + multiplicateur + décalage), avant `MinCents` et `MaxCents`. Ils sont revérifiés à chaque réajustement : une annonce dont le prix passe au-dessus de `PriceAboveCents`, ou en dessous de `PriceBelowCents`, est retirée de la vente et l'objet revient dans l'inventaire.
+Les verrous de prix comparent le prix calculé (source + multiplicateur + décalage), avant `MinCents` et `MaxCents`. Ils sont revérifiés à chaque réajustement : une annonce créée par le plugin dont le prix passe au-dessus de `PriceAboveCents`, ou en dessous de `PriceBelowCents`, est retirée de la vente et l'objet revient dans l'inventaire. Les annonces que tu as créées à la main restent en vente.
 
 ### Exemples
 
@@ -179,7 +179,8 @@ Les commandes font la même chose que les boutons de la page. À envoyer dans le
 
 - **Identifiants des objets** : pour lire le carnet d'ordres d'un objet, il faut son identifiant sur le marché. Le plugin le trouve dans la page de l'objet, puis le garde en mémoire pour toujours (dans `config/ASF.db`). Steam surveille beaucoup cette page : au premier aperçu, avec beaucoup d'objets différents, il peut limiter les requêtes. Le plugin s'arrête alors et reprend au lancement suivant, sans redemander les identifiants déjà connus.
 - **Réajustement** : Steam ne permet pas de modifier le prix d'une annonce, donc le plugin la retire, puis remet l'objet en vente au nouveau prix. Chaque remise en vente demande une nouvelle confirmation, faite par l'authentificateur ASF.
-- **Annonces gérées** : seules les annonces d'objets que le plugin a déjà vus dans l'inventaire, et qui passent les filtres `Types` et `Lock`, sont réajustées. Les annonces créées à la main avant l'installation ne sont pas touchées.
+- **Annonces gérées** : le plugin gère toutes tes annonces d'objets qui passent les filtres `Types` et `Lock`, y compris celles que tu as créées à la main ou avec un autre outil. Pour les objets qu'il n'a jamais vus dans l'inventaire, il déduit le type, la rareté et le jeu du texte de l'annonce (par exemple « Portal 2 Uncommon Emoticon »). Pour qu'il ne touche pas à une annonce, verrouille son objet (nom, jeu, rareté ou catégorie).
+- **Annonces créées à la main** : leur prix est réajusté comme les autres. En revanche, un verrou de prix ne les retire jamais du marché, puisque tu as choisi de les vendre : elles restent en vente avec le statut « Laissée en vente ». Le plugin reconnaît ses propres annonces grâce aux confirmations qu'il valide. Les annonces qu'il a créées avant la version 1.3.0 sont donc vues comme créées à la main, jusqu'à leur prochain réajustement.
 - **Limite de requêtes** : si Steam répond « trop de requêtes » (HTTP 429), le plugin arrête et attend 15 minutes avant de refaire des requêtes au marché. Augmente `RequestDelayMilliseconds` si ça arrive souvent.
 - **Confirmations** : le plugin valide toutes les annonces du marché en attente sur le compte, y compris celles que tu aurais créées à la main au même moment.
 

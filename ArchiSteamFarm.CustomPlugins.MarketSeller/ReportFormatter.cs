@@ -89,7 +89,7 @@ internal static class ReportFormatter {
 
 		string verb = result.DryRun ? "seraient" : "ont été";
 
-		string summary = $"{result.Lines.Count} annonce(s) vérifiée(s) : {Count(result.Lines, ERepriceStatus.Repriced)} {verb} réajustée(s), {Count(result.Lines, ERepriceStatus.Withdrawn)} {verb} retirée(s), {Count(result.Lines, ERepriceStatus.Unchanged)} inchangée(s), {Count(result.Lines, ERepriceStatus.Skipped)} sans prix de référence, {Count(result.Lines, ERepriceStatus.Failed)} échec(s).";
+		string summary = $"{result.Lines.Count} annonce(s) vérifiée(s) dont {result.Lines.Count(static line => !line.CreatedByPlugin)} créée(s) à la main : {Count(result.Lines, ERepriceStatus.Repriced)} {verb} réajustée(s), {Count(result.Lines, ERepriceStatus.Withdrawn)} {verb} retirée(s), {Count(result.Lines, ERepriceStatus.Unchanged) + Count(result.Lines, ERepriceStatus.Kept)} inchangée(s), {Count(result.Lines, ERepriceStatus.Skipped)} sans prix de référence, {Count(result.Lines, ERepriceStatus.Failed)} échec(s).";
 
 		return AppendNotices(summary, result.RateLimitedUntil, false);
 	}
@@ -141,6 +141,7 @@ internal static class ReportFormatter {
 	private static string FormatLine(RepriceLine line, string? currency) => line.Status switch {
 		ERepriceStatus.Repriced => $"{line.Name} : {FormatPrice(line.CurrentBuyerPrice, currency)} → {FormatPrice(line.TargetBuyerPrice ?? 0, currency)}",
 		ERepriceStatus.Withdrawn => $"{line.Name} : retiré de la vente, {line.Reason}",
+		ERepriceStatus.Kept => $"{line.Name} : laissé en vente, {line.Reason}",
 		ERepriceStatus.Failed => $"{line.Name} : échec ({line.Reason ?? "raison inconnue"})",
 		_ => $"{line.Name} : prix laissé tel quel ({line.Reason ?? "raison inconnue"})"
 	};

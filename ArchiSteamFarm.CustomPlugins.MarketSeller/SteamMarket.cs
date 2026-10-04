@@ -19,7 +19,14 @@ namespace ArchiSteamFarm.CustomPlugins.MarketSeller;
 
 internal sealed record OrderHistogram(uint? HighestBuyOrder, uint? LowestSellOrder, ImmutableArray<SellOrderLevel> SellOrderGraph);
 
-internal sealed record OwnListing(ulong ListingID, uint AppID, ulong ContextID, ulong AssetID, string? MarketHashName, uint BuyerPrice, uint SellerPrice);
+internal sealed record OwnListing(ulong ListingID, uint AppID, ulong ContextID, ulong AssetID, string? MarketHashName, uint BuyerPrice, uint SellerPrice) {
+	// Read from the item description attached to the listing, see ItemClassifier
+	internal string? IconHash { get; init; }
+	internal string? Name { get; init; }
+	internal EAssetRarity Rarity { get; init; }
+	internal uint RealAppID { get; init; }
+	internal EAssetType Type { get; init; }
+}
 
 internal readonly record struct SellResult(bool Success, bool NeedsConfirmation, string? Message);
 
@@ -92,7 +99,7 @@ internal static partial class SteamMarket {
 		List<OwnListing> result = [];
 
 		for (uint start = 0; ; start += ListingsPageSize) {
-			Uri request = new(CommunityURL, $"/market/mylistings?norender=1&start={start}&count={ListingsPageSize}");
+			Uri request = new(CommunityURL, $"/market/mylistings?norender=1&l=english&start={start}&count={ListingsPageSize}");
 
 			ObjectResponse<JsonElement>? response = await Throttled(delay, () => bot.ArchiWebHandler.UrlGetToJsonObjectWithSession<JsonElement>(request, requestOptions: ErrorTolerantOptions)).ConfigureAwait(false);
 
@@ -285,7 +292,8 @@ internal static partial class SteamMarket {
 	[GeneratedRegex(@"Market_LoadOrderSpread\(\s*(?<id>\d+)\s*\)", RegexOptions.CultureInvariant)]
 	private static partial Regex ItemNameIDRegex();
 
-	private static string? LookupAssetHashName(JsonElement json, uint appID, ulong contextID, ulong assetID) {
+	// The "assets" object maps appid -> contextid -> assetid -> item description
+	private static JsonElement? LookupAsset(JsonElement json, uint appID, ulong contextID, ulong assetID) {
 		if (!TryGetMember(json, "assets", out JsonElement assets) || (assets.ValueKind != JsonValueKind.Object)) {
 			return null;
 		}
@@ -298,11 +306,27 @@ internal static partial class SteamMarket {
 			return null;
 		}
 
-		if (!TryGetMember(context, assetID.ToString(CultureInfo.InvariantCulture), out JsonElement asset) || (asset.ValueKind != JsonValueKind.Object)) {
-			return null;
+		return TryGetMember(context, assetID.ToString(CultureInfo.InvariantCulture), out JsonElement asset) && (asset.ValueKind == JsonValueKind.Object) ? asset : null;
+	}
+
+	private static OwnListing WithDescription(OwnListing listing, JsonElement? description) {
+		string? marketHashName = listing.MarketHashName ?? (description.HasValue ? GetString(description.Value, "market_hash_name") : null);
+
+		if (!description.HasValue) {
+			return listing with { MarketHashName = marketHashName, RealAppID = ItemClassifier.GetRealAppID(null, marketHashName) };
 		}
 
-		return GetString(asset, "market_hash_name");
+		JsonElement item = description.Value;
+		(EAssetType type, EAssetRarity rarity) = ItemClassifier.Classify(GetString(item, "type"), marketHashName);
+
+		return listing with {
+			IconHash = GetString(item, "icon_url") is { Length: > 0 } iconHash ? iconHash : null,
+			MarketHashName = marketHashName,
+			Name = GetString(item, "name") is { Length: > 0 } name ? name : null,
+			Rarity = rarity,
+			RealAppID = ItemClassifier.GetRealAppID(GetUInt(item, "market_fee_app"), marketHashName),
+			Type = type
+		};
 	}
 
 	[GeneratedRegex(@"<span[^>]*\btitle=""[^""]*""[^>]*>\s*\(?(?<price>[^<()]*?\d[^<()]*?)\)?\s*</span>", RegexOptions.CultureInvariant)]
@@ -344,7 +368,7 @@ internal static partial class SteamMarket {
 				continue;
 			}
 
-			result.Add(new OwnListing(listingID, appID, contextID, assetID, LookupAssetHashName(json, appID, contextID, assetID), buyerPrice, sellerPrice));
+			result.Add(WithDescription(new OwnListing(listingID, appID, contextID, assetID, null, buyerPrice, sellerPrice), LookupAsset(json, appID, contextID, assetID)));
 		}
 
 		return result;
@@ -371,9 +395,10 @@ internal static partial class SteamMarket {
 				continue;
 			}
 
-			string? marketHashName = GetString(asset, "market_hash_name") ?? LookupAssetHashName(json, appID.Value, contextID.Value, assetID.Value);
+			// The listing's own "asset" usually carries the full description, the top-level "assets" object is the fallback
+			JsonElement? description = TryGetMember(asset, "type", out _) ? asset : LookupAsset(json, appID.Value, contextID.Value, assetID.Value) ?? asset;
 
-			result.Add(new OwnListing(listingID.Value, appID.Value, contextID.Value, assetID.Value, marketHashName, sellerPrice.Value + fee.Value, sellerPrice.Value));
+			result.Add(WithDescription(new OwnListing(listingID.Value, appID.Value, contextID.Value, assetID.Value, GetString(asset, "market_hash_name"), sellerPrice.Value + fee.Value, sellerPrice.Value), description));
 		}
 
 		return result;

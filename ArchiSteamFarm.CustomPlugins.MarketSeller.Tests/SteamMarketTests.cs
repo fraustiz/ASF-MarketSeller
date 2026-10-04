@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json;
+using ArchiSteamFarm.Steam.Data;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace ArchiSteamFarm.CustomPlugins.MarketSeller.Tests;
@@ -42,7 +43,7 @@ internal sealed class SteamMarketTests {
 			["assets"] = new Dictionary<string, object> { ["753"] = new Dictionary<string, object> { ["6"] = new Dictionary<string, object> { ["456"] = new Dictionary<string, string> { ["market_hash_name"] = "440-Scout" } } } }
 		});
 
-		AssertSingleListing(json, new OwnListing(123, 753, 6, 456, "440-Scout", 10, 8));
+		AssertSingleListing(json, new OwnListing(123, 753, 6, 456, "440-Scout", 10, 8) { RealAppID = 440 });
 	}
 
 	[TestMethod]
@@ -58,7 +59,7 @@ internal sealed class SteamMarketTests {
 			}
 			""";
 
-		AssertSingleListing(json, new OwnListing(123, 753, 6, 456, "440-Scout", 10, 8));
+		AssertSingleListing(json, new OwnListing(123, 753, 6, 456, "440-Scout", 10, 8) { RealAppID = 440 });
 	}
 
 	[TestMethod]
@@ -73,7 +74,24 @@ internal sealed class SteamMarketTests {
 			}
 			""";
 
-		AssertSingleListing(json, new OwnListing(123, 753, 6, 456, "440-Scout", 10, 8));
+		AssertSingleListing(json, new OwnListing(123, 753, 6, 456, "440-Scout", 10, 8) { RealAppID = 440 });
+	}
+
+	[TestMethod]
+	public void ListingsCarryTheItemDescription() {
+		const string json = """
+			{
+				"success": true,
+				"listings": [
+					{
+						"listingid": "123", "price": 8, "fee": 2,
+						"asset": { "appid": 753, "contextid": "6", "id": "456", "market_hash_name": "620-:cake:", "name": ":cake:", "type": "Portal 2 Uncommon Emoticon", "icon_url": "abc", "market_fee_app": 620 }
+					}
+				]
+			}
+			""";
+
+		AssertSingleListing(json, new OwnListing(123, 753, 6, 456, "620-:cake:", 10, 8) { IconHash = "abc", Name = ":cake:", Rarity = EAssetRarity.Uncommon, RealAppID = 620, Type = EAssetType.Emoticon });
 	}
 
 	[TestMethod]

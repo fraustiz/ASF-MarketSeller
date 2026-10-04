@@ -28,6 +28,7 @@ internal sealed class BotMarketSeller : IDisposable {
 	internal OperationProgress? Progress => ProgressTracker.Snapshot;
 
 	private readonly Bot Bot;
+	private readonly ListingTracker Listings;
 	private readonly ProgressTracker ProgressTracker = new();
 	private readonly Timer? RepriceTimer;
 
@@ -43,6 +44,7 @@ internal sealed class BotMarketSeller : IDisposable {
 
 		Bot = bot;
 		Config = config;
+		Listings = new ListingTracker(bot);
 
 		if (config.SellIntervalMinutes > 0) {
 			SellTimer = new Timer(OnSellTimer, null, InitialSellDelay, TimeSpan.FromMinutes(config.SellIntervalMinutes));
@@ -176,6 +178,11 @@ internal sealed class BotMarketSeller : IDisposable {
 			Bot.ArchiLogger.LogGenericWarning($"Confirmation des annonces : {message}");
 		}
 
+		// The creator of a market listing confirmation is the listing itself
+		if (handledConfirmations != null) {
+			Listings.Add(handledConfirmations.Where(static confirmation => confirmation.ConfirmationType == EMobileConfirmationType.MarketListing).Select(static confirmation => confirmation.CreatorID));
+		}
+
 		return (uint) (handledConfirmations?.Count ?? 0);
 	}
 
@@ -259,13 +266,24 @@ internal sealed class BotMarketSeller : IDisposable {
 		}
 	}
 
+	// Whether the listing passes the same filters as inventory items, whoever created it
 	private bool IsManaged(OwnListing listing) {
 		if ((listing.AppID != Asset.SteamAppID) || (listing.ContextID != Asset.SteamCommunityContextID) || string.IsNullOrEmpty(listing.MarketHashName)) {
 			return false;
 		}
 
-		// We only know type, rarity and game of the items we've seen in the inventory, other listings are left alone
 		CachedItem? item = ItemCache.Get(listing.MarketHashName);
+
+		// Items seen in the inventory are classified by ASF from Steam's tags, the others (e.g. listed by hand) from the listing's type line
+		if (item is not { Type: not EAssetType.Unknown }) {
+			if (listing.Type == EAssetType.Unknown) {
+				return false;
+			}
+
+			ItemCache.Remember(listing.MarketHashName, listing.Type, listing.Rarity, listing.RealAppID, listing.Name ?? listing.MarketHashName, listing.IconHash);
+
+			item = ItemCache.Get(listing.MarketHashName);
+		}
 
 		return (item != null) && Config.Types.Contains(item.Type) && !Config.Lock.IsItemLocked(listing.MarketHashName, item.Name, item.Rarity, item.RealAppID);
 	}
@@ -344,6 +362,7 @@ internal sealed class BotMarketSeller : IDisposable {
 
 				RepriceLine CreateLine(OwnListing listing, ERepriceStatus status, uint? targetPrice = null, string? reason = null, uint? adjustedPrice = null) => new() {
 					AdjustedPrice = adjustedPrice,
+					CreatedByPlugin = Listings.IsCreatedByPlugin(listing.ListingID),
 					CurrentBuyerPrice = listing.BuyerPrice,
 					IconHash = item?.IconHash,
 					ListingID = listing.ListingID.ToString(CultureInfo.InvariantCulture),
@@ -367,6 +386,13 @@ internal sealed class BotMarketSeller : IDisposable {
 				}
 
 				foreach (OwnListing listing in group) {
+					// The user listed it by hand, so they want it sold: a price lock doesn't take it off the market
+					if (priceLocked && !Listings.IsCreatedByPlugin(listing.ListingID)) {
+						lines.Add(CreateLine(listing, ERepriceStatus.Kept, reason: $"verrouillé par prix ({ReportFormatter.FormatPrice(quote.AdjustedPrice, currency)}), annonce créée à la main", adjustedPrice: quote.AdjustedPrice));
+
+						continue;
+					}
+
 					if (!priceLocked && (Math.Abs((long) listing.BuyerPrice - quote.BuyerPrice) < Config.RepriceThresholdCents)) {
 						lines.Add(CreateLine(listing, ERepriceStatus.Unchanged, quote.BuyerPrice));
 
@@ -390,6 +416,9 @@ internal sealed class BotMarketSeller : IDisposable {
 			}
 		} catch (MarketRateLimitedException) {
 			rateLimitedUntil = SteamMarket.RateLimitedUntil;
+		} finally {
+			// Items learned from hand-made listings
+			ItemCache.Save();
 		}
 
 		if (dryRun || (removed == 0)) {
