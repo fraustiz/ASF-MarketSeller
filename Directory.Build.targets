@@ -1,0 +1,8 @@
+<Project>
+	<!-- Downloads ArchiSteamFarm.dll from the official ASF release on first build, so no ASF binary is stored in the repository -->
+	<Target Name="DownloadASFAssembly" BeforeTargets="ResolveAssemblyReferences" Condition="'$(NeedsASFAssembly)' == 'true' AND !Exists('$(ASFAssemblyPath)')">
+		<DownloadFile SourceUrl="https://github.com/JustArchiNET/ArchiSteamFarm/releases/download/$(ASFVersion)/ASF-generic.zip" DestinationFolder="$(ASFLibDirectory)" DestinationFileName="ASF-generic.zip" />
+		<Unzip SourceFiles="$(ASFLibDirectory)ASF-generic.zip" DestinationFolder="$(ASFLibDirectory)" Include="ArchiSteamFarm.dll" />
+		<Delete Files="$(ASFLibDirectory)ASF-generic.zip" />
+	</Target>
+</Project>

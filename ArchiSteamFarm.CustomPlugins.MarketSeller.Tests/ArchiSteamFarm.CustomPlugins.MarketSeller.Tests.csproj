@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<OutputType>Library</OutputType>
+		<NeedsASFAssembly>true</NeedsASFAssembly>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="MSTest" Version="4.4.1" />
+		<PackageReference Include="SteamKit2" Version="3.4.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\ArchiSteamFarm.CustomPlugins.MarketSeller\ArchiSteamFarm.CustomPlugins.MarketSeller.csproj" />
+		<Reference Include="ArchiSteamFarm" HintPath="$(ASFAssemblyPath)" />
+	</ItemGroup>
+</Project>

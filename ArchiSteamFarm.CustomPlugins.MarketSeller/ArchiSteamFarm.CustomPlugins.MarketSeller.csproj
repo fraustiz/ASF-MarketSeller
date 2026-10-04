@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<OutputType>Library</OutputType>
+		<NeedsASFAssembly>true</NeedsASFAssembly>
+
+		<!-- Otherwise the compiler adds a SecurityPermission attribute, a type missing from ASF's trimmed Docker image -->
+		<AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+	</ItemGroup>
+
+	<!-- Compile-time only, ASF provides them at runtime -->
+	<ItemGroup>
+		<PackageReference Include="SteamKit2" Version="3.4.0" IncludeAssets="compile" />
+		<PackageReference Include="System.Composition.AttributedModel" Version="10.0.12" IncludeAssets="compile" />
+		<Reference Include="ArchiSteamFarm" HintPath="$(ASFAssemblyPath)" Private="false" />
+	</ItemGroup>
+
+	<!-- The web page is embedded in the DLL and written to a temporary folder at runtime, see WebAssets.cs -->
+	<ItemGroup>
+		<EmbeddedResource Include="www\*" LogicalName="MarketSeller.www.%(Filename)%(Extension)" />
+	</ItemGroup>
+</Project>

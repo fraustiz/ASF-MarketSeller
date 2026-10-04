@@ -1,0 +1,6 @@
+using System;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+[assembly: CLSCompliant(false)]
+[assembly: DiscoverInternals]
+[assembly: Parallelize(Scope = ExecutionScope.MethodLevel)]

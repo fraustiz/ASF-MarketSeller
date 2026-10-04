@@ -1,0 +1,68 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['[0-9]+.[0-9]+.[0-9]+*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_NOLOGO: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Read versions
+        id: versions
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            echo "plugin=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          else
+            echo "plugin=$(grep -oP '(?<=<Version>)[^<]+' Directory.Build.props)" >> "$GITHUB_OUTPUT"
+          fi
+          echo "asf=$(grep -oP '(?<=<ASFVersion>)[^<]+' Directory.Build.props)" >> "$GITHUB_OUTPUT"
+
+      - name: Test
+        run: dotnet test ArchiSteamFarm.CustomPlugins.MarketSeller.Tests
+
+      - name: Publish plugin
+        run: dotnet publish ArchiSteamFarm.CustomPlugins.MarketSeller -c Release -o out -p:Version=${{ steps.versions.outputs.plugin }}
+
+      # ASF's Docker image (latest tag) is a trimmed build: .NET methods ASF doesn't use itself are removed from it,
+      # and a plugin calling one of them crashes at runtime. Build the same trimmed ASF and check every reference of the plugin against it.
+      - name: Build trimmed ASF ${{ steps.versions.outputs.asf }}
+        run: |
+          git clone --quiet --depth 1 --branch "${{ steps.versions.outputs.asf }}" https://github.com/JustArchiNET/ArchiSteamFarm.git "$RUNNER_TEMP/asf-src"
+          dotnet publish "$RUNNER_TEMP/asf-src/ArchiSteamFarm" -c Release -o "$RUNNER_TEMP/asf-trimmed" -r linux-x64 --self-contained -p:PublishTrimmed=true -p:ASFVariant=linux-x64 -p:ContinuousIntegrationBuild=true
+
+      - name: Check compatibility with trimmed ASF
+        run: dotnet run --project tools/TrimCheck -c Release -- out/ArchiSteamFarm.CustomPlugins.MarketSeller.dll "$RUNNER_TEMP/asf-trimmed"
+
+      # ASF's plugin updater extracts the zip into the plugin folder, so the DLL goes at its root
+      - name: Package
+        run: zip -j MarketSeller.zip out/ArchiSteamFarm.CustomPlugins.MarketSeller.dll
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MarketSeller-${{ steps.versions.outputs.plugin }}
+          path: MarketSeller.zip
+
+      # ASF reads the tag name as the plugin version, so tags must be plain numbers like 1.2.0
+      - name: Create release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" MarketSeller.zip --title "MarketSeller $GITHUB_REF_NAME" --generate-notes

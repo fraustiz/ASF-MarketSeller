@@ -1,0 +1,8 @@
+bin/
+obj/
+out/
+.vs/
+*.user
+
+# ArchiSteamFarm.dll, downloaded from the official ASF release on first build
+lib/

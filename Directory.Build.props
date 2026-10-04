@@ -1,0 +1,29 @@
+<Project>
+	<PropertyGroup>
+		<!-- Plugin version, overridden by the tag name when GitHub Actions builds a release -->
+		<Version>1.2.0</Version>
+
+		<!-- ASF release the plugin is compiled against: its ArchiSteamFarm.dll is downloaded on first build, see Directory.Build.targets -->
+		<ASFVersion>6.3.10.3</ASFVersion>
+		<ASFLibDirectory>$(MSBuildThisFileDirectory)lib\$(ASFVersion)\</ASFLibDirectory>
+		<ASFAssemblyPath>$(ASFLibDirectory)ArchiSteamFarm.dll</ASFAssemblyPath>
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<AnalysisMode>AllEnabledByDefault</AnalysisMode>
+		<Authors>fraustiz</Authors>
+		<CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+		<Deterministic>true</Deterministic>
+		<LangVersion>latest</LangVersion>
+		<NoWarn>CA1028,CA1031,CS1591</NoWarn>
+		<Nullable>enable</Nullable>
+		<RepositoryUrl>https://github.com/fraustiz/ASF-MarketSeller</RepositoryUrl>
+		<TargetFramework>net10.0</TargetFramework>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)' == 'Release'">
+		<CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>
+		<DebugType>none</DebugType>
+		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+	</PropertyGroup>
+</Project>
